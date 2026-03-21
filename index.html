@@ -3,135 +3,99 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kele-Arabe - Lecture & Traduction</title>
+    <title>Kele-Arabe - Bibliothèque Automatique</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
-    
     <style>
-        :root { --primary: #2c3e50; --accent: #e67e22; --bg: #f4f7f6; }
-        body { font-family: 'Poppins', sans-serif; margin: 0; background: var(--bg); display: flex; flex-direction: column; align-items: center; }
+        :root { --primary: #2c3e50; --accent: #e67e22; }
+        body { font-family: 'Poppins', sans-serif; margin: 0; background: #f0f2f5; height: 100vh; display: flex; flex-direction: column; }
         
-        header { background: var(--primary); color: white; width: 100%; padding: 15px; text-align: center; font-weight: bold; position: sticky; top:0; z-index:10; }
+        header { background: var(--primary); color: white; padding: 10px; text-align: center; font-size: 1.2rem; font-weight: bold; }
 
-        .app-container { width: 95%; max-width: 800px; margin: 15px auto; }
+        /* Menu de sélection des cours */
+        .menu-container { padding: 10px; background: white; border-bottom: 2px solid var(--accent); }
+        select { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 1rem; }
 
-        /* Liseuse PDF */
-        .pdf-viewer { background: white; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); padding: 10px; position: relative; }
-        #pdf-canvas { width: 100%; height: auto; border-radius: 5px; border: 1px solid #ddd; }
-        
-        .controls { margin: 10px 0; display: flex; justify-content: space-between; align-items: center; }
-        .btn { background: var(--primary); color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        /* Zone d'affichage divisée */
+        .main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 
-        /* Section Traducteur */
-        .translation-section { background: white; margin-top: 20px; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); border-top: 4px solid var(--accent); }
-        h3 { margin-top: 0; color: var(--primary); font-size: 1.1rem; }
+        /* PDF (Moitié haute) */
+        .pdf-section { flex: 1; overflow-y: auto; background: #525659; position: relative; border-bottom: 3px solid var(--primary); }
+        #pdf-canvas { width: 100%; height: auto; display: block; margin: 0 auto; }
         
-        #text-to-translate { width: 100%; height: 80px; margin: 10px 0; padding: 10px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; }
-        
-        #result-box { background: #fff9c4; padding: 15px; border-radius: 8px; min-height: 50px; border-left: 5px solid var(--accent); margin-top: 10px; font-style: italic; color: #333; }
-        
-        .loader { display: none; color: var(--accent); font-weight: bold; text-align: center; margin: 10px 0; }
+        .pdf-nav { position: absolute; bottom: 10px; left: 0; right: 0; display: flex; justify-content: space-around; pointer-events: none; }
+        .nav-btn { background: var(--primary); color: white; border: none; padding: 8px 15px; border-radius: 20px; cursor: pointer; pointer-events: auto; opacity: 0.9; }
+
+        /* Traducteur (Moitié basse) */
+        .translator-section { height: 40%; background: white; border-top: 1px solid #ccc; }
+        iframe { width: 100%; height: 100%; border: none; }
+
+        .hidden { display: none; }
     </style>
 </head>
 <body>
 
-<header>KELE-ARABE : LECTURE & TRADUCTION</header>
+<header>KELE-ARABE : LECTEUR IA</header>
 
-<div class="app-container">
-    
-    <!-- LECTURE PDF -->
-    <div class="pdf-viewer">
+<!-- 1. SÉLECTION DU COURS -->
+<div class="menu-container">
+    <select id="pdf-selector" onchange="loadNewPDF(this.value)">
+        <option value="">-- Choisir un cours --</option>
+        <!-- Liste tes PDF ici une seule fois -->
+        <option value="Tome1/Lecture.pdf">Leçon 1 : Lecture</option>
+        <option value="Tome1/Grammaire.pdf">Leçon 2 : Grammaire</option>
+        <option value="Tome1/Vocabulaire.pdf">Leçon 3 : Vocabulaire</option>
+        <!-- Tu peux en ajouter 100 ici très vite -->
+    </select>
+</div>
+
+<div class="main-content">
+    <!-- 2. ZONE PDF -->
+    <div class="pdf-section" id="pdf-area">
         <canvas id="pdf-canvas"></canvas>
-        <div class="controls">
-            <button class="btn" id="prev-page">⬅</button>
-            <span>Page <span id="page-num">1</span> / <span id="page-count">?</span></span>
-            <button class="btn" id="next-page">➡</button>
+        <div class="pdf-nav">
+            <button class="nav-btn" onclick="prevPage()">Précédent</button>
+            <button class="nav-btn" onclick="nextPage()">Suivant</button>
         </div>
-        <button class="btn" id="extract-btn" style="width: 100%; background: var(--accent);">📄 Extraire le texte de cette page</button>
     </div>
 
-    <!-- TRADUCTEUR Hugging Face -->
-    <div class="translation-section">
-        <h3>🌍 Traducteur Intelligent (AI)</h3>
-        <textarea id="text-to-translate" placeholder="Le texte extrait apparaîtra ici..."></textarea>
-        <button class="btn" style="width: 100%;" onclick="translateText()">Traduire maintenant</button>
-        
-        <div id="loader" class="loader">Analyse et traduction en cours...</div>
-        <div id="result-box">La traduction s'affichera ici.</div>
+    <!-- 3. ZONE TRADUCTEUR Hugging Face -->
+    <div class="translator-section">
+        <iframe src="https://soumah224-mon-traducteur.hf.space"></iframe>
     </div>
-
 </div>
 
 <script>
-    const url = 'Tome1/Lecture.pdf'; 
-    const HF_API_URL = "https://soumah224-mon-traducteur.hf.space/run/predict"; // URL de ton Space
-    
-    let pdfDoc = null, pageNum = 1, scale = 1.5, canvas = document.getElementById('pdf-canvas'), ctx = canvas.getContext('2d');
-
+    let pdfDoc = null, pageNum = 1, scale = 1.3, canvas = document.getElementById('pdf-canvas'), ctx = canvas.getContext('2d');
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-    // Charger le PDF
-    pdfjsLib.getDocument(url).promise.then(pdf => {
-        pdfDoc = pdf;
-        document.getElementById('page-count').textContent = pdf.numPages;
-        renderPage(pageNum);
-    });
+    // Fonction pour charger un PDF
+    function loadNewPDF(pdfUrl) {
+        if(!pdfUrl) return;
+        pageNum = 1;
+        pdfjsLib.getDocument(pdfUrl).promise.then(pdf => {
+            pdfDoc = pdf;
+            renderPage(pageNum);
+        }).catch(err => alert("Fichier introuvable. Vérifiez le nom dans GitHub."));
+    }
 
     function renderPage(num) {
         pdfDoc.getPage(num).then(page => {
             let viewport = page.getViewport({scale: scale});
-            canvas.height = viewport.height;
-            canvas.width = viewport.width;
-            page.render({canvasContext: ctx, viewport: viewport});
+            let outputScale = window.innerWidth / viewport.width;
+            let finalViewport = page.getViewport({scale: outputScale});
+
+            canvas.height = finalViewport.height;
+            canvas.width = finalViewport.width;
+            page.render({canvasContext: ctx, viewport: finalViewport});
         });
-        document.getElementById('page-num').textContent = num;
     }
 
-    // EXTRACTION DU TEXTE DE LA PAGE
-    document.getElementById('extract-btn').addEventListener('click', () => {
-        pdfDoc.getPage(pageNum).then(page => {
-            page.getTextContent().then(content => {
-                let text = content.items.map(item => item.str).join(' ');
-                document.getElementById('text-to-translate').value = text;
-            });
-        });
-    });
+    function prevPage() { if(pageNum <= 1) return; pageNum--; renderPage(pageNum); }
+    function nextPage() { if(pageNum >= pdfDoc.numPages) return; pageNum++; renderPage(pageNum); }
 
-    // FONCTION DE TRADUCTION (Appel API Hugging Face)
-    async function translateText() {
-        const text = document.getElementById('text-to-translate').value;
-        if(!text) return;
-
-        document.getElementById('loader').style.display = "block";
-        document.getElementById('result-box').innerText = "";
-
-        try {
-            const response = await fetch(HF_API_URL, {
-                method: "POST",
-                headers: { 
-                    "Content-Type": "application/json"
-                    // "Authorization": "Bearer TON_TOKEN_ICI" // Ajoute si ton space est privé
-                },
-                body: JSON.stringify({
-                    data: [text] // Dépend de comment ton Space Gradio est configuré
-                })
-            });
-
-            const result = await response.json();
-            // On récupère la réponse (Gradio renvoie souvent un tableau 'data')
-            document.getElementById('result-box').innerText = result.data[0];
-        } catch (error) {
-            document.getElementById('result-box').innerText = "Erreur : Impossible de contacter le traducteur. Vérifiez que le Space est 'Public'.";
-            console.error(error);
-        } finally {
-            document.getElementById('loader').style.display = "none";
-        }
-    }
-
-    // Navigation
-    document.getElementById('prev-page').onclick = () => { if(pageNum <= 1) return; pageNum--; renderPage(pageNum); };
-    document.getElementById('next-page').onclick = () => { if(pageNum >= pdfDoc.numPages) return; pageNum++; renderPage(pageNum); };
-
+    // Chargement auto du premier si besoin
+    // loadNewPDF('Tome1/Lecture.pdf');
 </script>
 
 </body>
